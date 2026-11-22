@@ -1,0 +1,4 @@
+# 开发板：ESP32-S3-DevKitC-1
+# 芯片目标不在这里选择。克隆后执行：idf.py set-target esp32s3
+# 该板常见模组为 ESP32-S3-WROOM-1，flash 8 MB。
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y

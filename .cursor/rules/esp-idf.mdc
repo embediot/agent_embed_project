@@ -1,0 +1,98 @@
+---
+description: ESP-IDF 样章跟做。先编译并确认失败，只改一处函数签名错误，再编译并通过。由人审阅产生的 diff，读者不需要自己输入编译命令。
+alwaysApply: true
+---
+
+# ESP-IDF 跟做规则
+
+本规则交给 Cursor 代理执行。代理自己运行构建命令。构建结束后，由人审阅产生的 diff。读者不需要自己动手输入编译命令。
+复制到别的 ESP-IDF 工程时，先按文末「移植」修改列出的几项，再使用。
+
+## 钉死的版本
+
+- ESP-IDF **v5.5.6**（发布标签 `v5.5.6`，2026-10-16，5.5 稳定小版本）
+- 状态：**已验证**。已用这一版跑通「`idf.py build` 失败 → 只改调用处一行 → `idf.py build` 通过」
+- 不要写成「最新版」，也不要升级到别的版本来绕过编译错误
+
+## 芯片与开发板
+
+- 芯片：ESP32-S3
+- IDF target：`esp32s3`
+- 开发板全名：ESP32-S3-DevKitC-1
+- 不要改目标芯片，不要换成客户板或量产配置
+
+## 构建命令
+
+只在工程根目录执行这两条：
+
+```bash
+idf.py set-target esp32s3
+idf.py build
+```
+
+`sdkconfig` 里目标已经是 `esp32s3` 时，可以不重复执行 `set-target`。
+第一次在干净树上构建时，必须先 `set-target esp32s3`，否则会落到默认的 esp32。
+
+烧录、整片擦除、量产烧录不在本演示范围。禁止执行或新增会自动跑起来的：
+
+- `idf.py flash`、`idf.py erase-flash`、`idf.py erase_flash`、`idf.py monitor`
+- `esptool.py` 的 `write_flash` / `erase_flash`
+- 烧录脚本、擦除脚本、CI、量产或客户板流程
+
+## 目录
+
+```
+CMakeLists.txt
+sdkconfig.defaults
+main/CMakeLists.txt
+main/main.c
+.gitignore
+AGENTS.md
+.cursor/rules/esp-idf.mdc
+```
+
+`build/`、`sdkconfig`、`sdkconfig.old`、`managed_components/`、`dependencies.lock` 是生成物，不要提交。
+
+## 禁改区
+
+不要改这些文件，也不要靠改它们让编译通过：
+
+- `CMakeLists.txt`
+- `main/CMakeLists.txt`
+- `sdkconfig.defaults`
+- `.gitignore`
+- `AGENTS.md`
+- `.cursor/rules/esp-idf.mdc`
+- `main/main.c` 里 `app_wait_ready` 的函数定义
+
+不要新增分区表、组件清单、Kconfig、包装脚本或 CI。
+
+## 允许修改区
+
+只有 `main/main.c` 里 `app_main` 对 `app_wait_ready` 的那一次调用。
+这次调用的参数个数，和函数声明 `app_wait_ready(int delay_ms)` 不一致。
+
+修复时只改这一次调用，让参数个数和声明一致，并且只动这一行。
+不要改函数定义，不要另加声明，不要删掉这行调用来躲过错误。
+
+## 代理要做的事
+
+1. 先执行 `idf.py set-target esp32s3`（目标已经是 esp32s3 时可以不重复执行），再执行 `idf.py build`。
+   这一次预期失败。不要在这次失败之前改源码。
+2. 确认失败点就是 `main/main.c` 里那次调用。编译器会报参数过少（`too few arguments to function 'app_wait_ready'`）。
+   若失败原因不是这一处（找不到 `idf.py`、目标不是 esp32s3、缺少组件头文件），停下来说明原因，不要改禁改区。
+3. 只修改这一次调用，使参数个数与函数声明一致。只改这一行。
+4. 再执行 `idf.py build`。这一次预期通过，生成 `build/agent_embed_project.elf`。
+5. 把产生的 diff 交给人审阅。不要烧录，不要擦除，不要把 `build/` 和 `sdkconfig` 提交进仓库。
+   成功日志末尾会打印 `idf.py flash`。那是 ESP-IDF 的固定提示，不要执行。
+
+## 移植
+
+复制到自己的 ESP-IDF 工程时，改这四项，其余禁令保持不动：
+
+- 版本号（写成具体的 `vX.Y.Z`，不要写「最新版」）
+- 芯片名、DevKit 全名、`idf.py set-target` 的 target
+- 允许修改区的源码路径。说明里只写调用和声明不一致，不要写上改完之后的完整调用
+- 通过后生成的 elf 文件名
+
+禁改区、禁止烧录和擦除、先确认编译失败再改一处再编译通过、由人审阅 diff 而不是让读者自己输入编译命令，这些都要保留。
